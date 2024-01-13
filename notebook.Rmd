@@ -45,7 +45,7 @@ We wish to get estimates of the above objects, and since our data is time series
 We will use Principal Component Analysis(PCA) as a dimension reduction technique.
 ```{r}
 start_date <- as.Date("2020-01-02")
-end_date <- as.Date("2020-01-10")
+end_date <- as.Date("2020-02-10")
   
 # Filter for specific date range and select only Date, Close, and Ticker
 stock_prices_filtered <- stock_prices %>%
@@ -186,6 +186,33 @@ optim_parm <- function(y){
 }
 ```
 
+We now test if we the gpr fitting makes sense to our model.
+```{r}
+y = wide_data$AAPL
+yy <- c(1)
+for (i in 2:length(y)){
+  yy <- c(yy,1+log(y[i]/y[1]))
+}
+optim_hyperparam = optim_parm(yy)
+results = kf.gp(yy,gamma=optim_hyperparam$gamma,Sigmaw = optim_hyperparam$Sigmaw,n=0)
+mu.p <- results$mu.p
+Sigma.p <- results$Sigma.p
+
+se.p <- sqrt(Sigma.p)
+
+alpha=0.01
+cv99 = qnorm(1-alpha/2)
+CIupper.p <- mu.p + cv99*se.p
+CIlower.p <- mu.p - cv99*se.p
+time = 1:(length(yy)+1)
+yy <- c(yy,yy[length(yy)])
+plot(time,yy,cex=0.5,col='darkgreen',pch=5,ylim=c(.9,1.1),main='Predicted y and observed y')
+points(time,mu.p,cex=0.5,col='red',pch=10)
+points(time,CIupper.p,col='blue',type ='l',lty=2,lwd=1)
+points(time,CIlower.p,col='blue',type ='l',lty=2,lwd=1)
+legend(1,.95,legend= c('Observation','Predicted','99% Upper Confidence Interval','99% Lower Confidence Interval'), col=c('darkgreen','red','blue','blue'),lty=c(1,1,2,2),cex=.6)
+```
+
 ## Model fitting
 
 ```{r}
@@ -195,7 +222,15 @@ num_pred_days <- 2 #Predict 2 days forward
 for(pc_idx in 1:k){
   y <- pca_result$x[,pc_idx]
   optim_hyperparam <- optim_parm(y)
-  gp_result <- kf.gp(y, optim_hyperparam$gamma, optim_hyperparam$Sigmaw, n = num_pred_days)
+  gp_result <- kf.gp(y, gamma = optim_hyperparam$gamma, Sigmaw = optim_hyperparam$Sigmaw, n = num_pred_days)
   print(tail(gp_result$mu.p, num_pred_days))
 }
 ```
+
+## Optimization
+As mentioned in the report, we propose two ways of balancing the expectation and variance. The first way is to maximize the expected return with constraint on the total variance bounded by the avg variance of PCs.
+
+```{r}
+
+```
+
